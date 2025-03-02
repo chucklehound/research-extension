@@ -1,8 +1,14 @@
 import { useEffect, useState } from "react";
 
+import { db } from "./firebaseConfig"; // Ensure this file is set up correctly
+import { collection, getDocs } from "firebase/firestore";
+
+import "./app.css";
+
+
 const mockInsights = [
   {
-    urlPattern: "/1234/pages",
+    urlPattern: "dentally.co/login",
     title: "Users struggle with navigation",
     creator: "Alice",
     date: "2024-02-27",
@@ -10,7 +16,7 @@ const mockInsights = [
     image: "https://link.to/jira.png"
   },
   {
-    urlPattern: "/5678/settings",
+    urlPattern: "dentally.co/login",
     title: "Settings page needs clearer labels",
     creator: "Bob",
     date: "2024-02-20",
@@ -28,24 +34,41 @@ function App() {
   const [insights, setInsights] = useState<typeof mockInsights>([]);
 
   useEffect(() => {
-    if (!chrome?.storage) return;
+    if (typeof chrome === "undefined" || !chrome.storage) return;
 
-    chrome.storage.local.get("lastVisitedURL", (data) => {
+    chrome.storage.local.get("lastVisitedURL", async (data) => {
       if (data.lastVisitedURL) {
         setUrl(data.lastVisitedURL);
-        setInsights(getInsights(data.lastVisitedURL));
+  
+        // Fetch insights from Firestore
+        const insightsRef = collection(db, "insights");
+        const snapshot = await getDocs(insightsRef);
+        const insightsData = snapshot.docs.map((doc) => doc.data() as { 
+          urlPattern: string; 
+          title: string; 
+          creator: string; 
+          date: string; 
+          tags: string[]; 
+          image: string;
+        });
+  
+        setInsights(insightsData.filter((insight) => data.lastVisitedURL.includes(insight.urlPattern)));
       }
     });
   }, []);
 
   return (
-    <div>
-      <h2>Current Page:</h2>
-      <p>{url || "No URL detected"}</p>
+    <div className="insights-main">
+      <header className="insights-header">
+        <h1>Dentally Research Buddy</h1>
+        <h2>Current Page: <span>{url || "No URL detected"}</span></h2>
+      </header>
+      
+      <div className="insights-list">
       <h3>Insights</h3>
       {insights.length > 0 ? (
         insights.map((insight, i) => (
-          <div key={i} style={{ border: "1px solid gray", padding: "10px", marginBottom: "10px" }}>
+          <div key={i} className="insight-card">
             <h4>{insight.title}</h4>
             <p><strong>By:</strong> {insight.creator} | <strong>Date:</strong> {insight.date}</p>
             <p><strong>Tags:</strong> {insight.tags.join(", ")}</p>
@@ -55,6 +78,7 @@ function App() {
       ) : (
         <p>No insights available for this page.</p>
       )}
+      </div>
     </div>
   );
 }
